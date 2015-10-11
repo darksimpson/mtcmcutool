@@ -11,6 +11,7 @@ int exitcode = 0;
 void print_banner()
 {
   printf("mtcmcutool: a tool to manipulate MTC MCU firmware images for RK3066/RK3188 headunits.\n");
+  printf("            Version: 1.0\n");
   printf("            Copyright (c) 2015, Dark Simpson\n");
   printf("\n");
 }
