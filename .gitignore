@@ -1,0 +1,5 @@
+Release/*
+.codelite/*
+Makefile
+mtcmcutool.txt
+mtcmcutool.mk
