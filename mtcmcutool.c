@@ -79,155 +79,157 @@ int main(int argc, char **argv)
     print_usage();
     exitcode = 1;
   }
-
-  if (!strncmp(argv[1], _ARGHLP("-d")))
-  {
-    if (argc == 4)
-    {
-      printf("You have selected MCU firmware decode. Good choice! ;)\n\n");
-      
-      /* Try to open input file */
-      infile = fopen(argv[2], "rb");
-      if (infile == NULL)
-        _ERRHLP("Error opening input file!\n", 2, FINALLY_A);
-      
-      /* Get file size */
-      fseek(infile, 0, SEEK_END);
-      inlen = ftell(infile);
-      if (inlen > 65536)
-        _ERRHLP("Input file is too big, not looks like valid MCU FW image!\n", 2, FINALLY_A);
-      fseek(infile, 0, SEEK_SET);
-      
-      /* Alloc buffer for all FW image */
-      buf = (uint8_t *) malloc(inlen);
-      if (buf == NULL)
-        _ERRHLP("Error allocating buffer!\n", 2, FINALLY_A);
-      
-      /* Read all FW image in buffer */
-      if (fread(buf, 1, inlen, infile) != inlen)
-        _ERRHLP("Error reading input file!\n", 2, FINALLY_A);
-      
-      /* Check signature and checksum */
-      if (buf[0] != 'm' || buf[1] != 't' || buf[2] != 'c' || calc_sum(buf, inlen) != 0xFF)
-        _ERRHLP("Your MCU FW image is invalid or corrupted (signature invalid or checksum error)!\n", 2, FINALLY_A);
-      
-      uint8_t *wbuf = &buf[4]; /* We need to start decoding skipping first */
-      int wlen = inlen-4;      /* 4 bytes with signature and checksum */
-      
-      /* Actually decode here */
-      xor_cnt(wbuf, wlen, 4);
-      
-      /* Try to open output file */
-      outfile = fopen(argv[3], "wb");
-      if (outfile == NULL)
-        _ERRHLP("Error opening output file!\n", 2, FINALLY_A);
-      
-      /* Write decoded FW to output file */
-      if (fwrite(wbuf, 1, wlen, outfile) != wlen)
-        _ERRHLP("Error writing output file!\n", 2, FINALLY_A);
-      
-      printf("All is done!\n");
-      
-FINALLY_A:
-      if (outfile != NULL)
-        fclose(outfile);
-      if (buf != NULL)
-        free(buf);
-      if (infile != NULL)
-        fclose(infile);
-    }
-    else
-    {
-      printf("Error: insufficient arguments.\n\n");
-      /*print_help();*/
-      exitcode = 1;
-    }
-  }
-  else if (!strncmp(argv[1], _ARGHLP("-e")))
-  {
-    if (argc == 4)
-    {
-      printf("You have selected MCU firmware encode.\n\n");
-      
-      /* Try to open input file */
-      infile = fopen(argv[2], "rb");
-      if (infile == NULL)
-        _ERRHLP("Error opening input file!\n", 2, FINALLY_B);
-      
-      /* Get file size */
-      fseek(infile, 0, SEEK_END);
-      inlen = ftell(infile);
-      if (inlen > 65536)
-        _ERRHLP("Input file is too big, not looks like valid MCU FW image!\n", 2, FINALLY_B);
-      fseek(infile, 0, SEEK_SET);
-      
-      int wlen = inlen+4; /* as we need extra space for signature and checksum */
-      
-      /* Alloc buffer for all FW image */
-      buf = (uint8_t *) malloc(wlen);
-      if (buf == NULL)
-        _ERRHLP("Error allocating buffer!\n", 2, FINALLY_B);
-      
-      uint8_t *wbuf = &buf[4]; /* We need to start encoding skipping first 4 bytes */
-      
-      /* Read all FW image in buffer */
-      if (fread(wbuf, 1, inlen, infile) != inlen)
-        _ERRHLP("Error reading input file!\n", 2, FINALLY_B);
-      
-      /* Actually encode here */
-      xor_cnt(wbuf, inlen, 4);
-      
-      /* Add signature and checksum */
-      buf[0] = 'm'; buf[1] = 't'; buf[2] = 'c';
-      buf[3] = 0x00;
-      buf[3] = 0xFF - calc_sum(buf, wlen);
-      
-      /* Try to open output file */
-      outfile = fopen(argv[3], "wb");
-      if (outfile == NULL)
-        _ERRHLP("Error opening output file!\n", 2, FINALLY_B);
-      
-      /* Write decoded FW to output file */
-      if (fwrite(buf, 1, wlen, outfile) != wlen)
-        _ERRHLP("Error writing output file!\n", 2, FINALLY_B);
-      
-      printf("All is done!\n");
-      
-FINALLY_B:
-      if (outfile != NULL)
-        fclose(outfile);
-      if (buf != NULL)
-        free(buf);
-      if (infile != NULL)
-        fclose(infile);
-    }
-    else
-    {
-      printf("Error: insufficient arguments.\n\n");
-      /*print_help();*/
-      exitcode = 1;
-    }
-  }
-#ifdef OPT_VER
-  else if (!strncmp(argv[1], _ARGHLP("-v")))
-  {
-    if (argc == 3)
-    {
-      /* Version detection is not completed for this moment */
-    }
-    else
-    {
-      printf("Error: insufficient arguments.\n\n");
-      /*print_help();*/
-      exitcode = 1;
-    }
-  }
-#endif
   else
   {
-    printf("Error: incorrect arguments.\n\n");
-    print_usage();
-    exitcode = 1;
+    if (!strncmp(argv[1], _ARGHLP("-d")))
+    {
+      if (argc == 4)
+      {
+        printf("You have selected MCU firmware decode. Good choice! ;)\n\n");
+        
+        /* Try to open input file */
+        infile = fopen(argv[2], "rb");
+        if (infile == NULL)
+          _ERRHLP("Error opening input file!\n", 2, FINALLY_A);
+        
+        /* Get file size */
+        fseek(infile, 0, SEEK_END);
+        inlen = ftell(infile);
+        if (inlen > 65536)
+          _ERRHLP("Input file is too big, not looks like valid MCU FW image!\n", 2, FINALLY_A);
+        fseek(infile, 0, SEEK_SET);
+        
+        /* Alloc buffer for all FW image */
+        buf = (uint8_t *) malloc(inlen);
+        if (buf == NULL)
+          _ERRHLP("Error allocating buffer!\n", 2, FINALLY_A);
+        
+        /* Read all FW image in buffer */
+        if (fread(buf, 1, inlen, infile) != inlen)
+          _ERRHLP("Error reading input file!\n", 2, FINALLY_A);
+        
+        /* Check signature and checksum */
+        if (buf[0] != 'm' || buf[1] != 't' || buf[2] != 'c' || calc_sum(buf, inlen) != 0xFF)
+          _ERRHLP("Your MCU FW image is invalid or corrupted (signature invalid or checksum error)!\n", 2, FINALLY_A);
+        
+        uint8_t *wbuf = &buf[4]; /* We need to start decoding skipping first */
+        int wlen = inlen-4;      /* 4 bytes with signature and checksum */
+        
+        /* Actually decode here */
+        xor_cnt(wbuf, wlen, 4);
+        
+        /* Try to open output file */
+        outfile = fopen(argv[3], "wb");
+        if (outfile == NULL)
+          _ERRHLP("Error opening output file!\n", 2, FINALLY_A);
+        
+        /* Write decoded FW to output file */
+        if (fwrite(wbuf, 1, wlen, outfile) != wlen)
+          _ERRHLP("Error writing output file!\n", 2, FINALLY_A);
+        
+        printf("All is done!\n");
+        
+      FINALLY_A:
+        if (outfile != NULL)
+          fclose(outfile);
+        if (buf != NULL)
+          free(buf);
+        if (infile != NULL)
+          fclose(infile);
+      }
+      else
+      {
+        printf("Error: insufficient arguments.\n\n");
+        /*print_help();*/
+        exitcode = 1;
+      }
+    }
+    else if (!strncmp(argv[1], _ARGHLP("-e")))
+    {
+      if (argc == 4)
+      {
+        printf("You have selected MCU firmware encode.\n\n");
+        
+        /* Try to open input file */
+        infile = fopen(argv[2], "rb");
+        if (infile == NULL)
+          _ERRHLP("Error opening input file!\n", 2, FINALLY_B);
+        
+        /* Get file size */
+        fseek(infile, 0, SEEK_END);
+        inlen = ftell(infile);
+        if (inlen > 65536)
+          _ERRHLP("Input file is too big, not looks like valid MCU FW image!\n", 2, FINALLY_B);
+        fseek(infile, 0, SEEK_SET);
+        
+        int wlen = inlen+4; /* as we need extra space for signature and checksum */
+        
+        /* Alloc buffer for all FW image */
+        buf = (uint8_t *) malloc(wlen);
+        if (buf == NULL)
+          _ERRHLP("Error allocating buffer!\n", 2, FINALLY_B);
+        
+        uint8_t *wbuf = &buf[4]; /* We need to start encoding skipping first 4 bytes */
+        
+        /* Read all FW image in buffer */
+        if (fread(wbuf, 1, inlen, infile) != inlen)
+          _ERRHLP("Error reading input file!\n", 2, FINALLY_B);
+        
+        /* Actually encode here */
+        xor_cnt(wbuf, inlen, 4);
+        
+        /* Add signature and checksum */
+        buf[0] = 'm'; buf[1] = 't'; buf[2] = 'c';
+        buf[3] = 0x00;
+        buf[3] = 0xFF - calc_sum(buf, wlen);
+        
+        /* Try to open output file */
+        outfile = fopen(argv[3], "wb");
+        if (outfile == NULL)
+          _ERRHLP("Error opening output file!\n", 2, FINALLY_B);
+        
+        /* Write decoded FW to output file */
+        if (fwrite(buf, 1, wlen, outfile) != wlen)
+          _ERRHLP("Error writing output file!\n", 2, FINALLY_B);
+        
+        printf("All is done!\n");
+        
+      FINALLY_B:
+        if (outfile != NULL)
+          fclose(outfile);
+        if (buf != NULL)
+          free(buf);
+        if (infile != NULL)
+          fclose(infile);
+      }
+      else
+      {
+        printf("Error: insufficient arguments.\n\n");
+        /*print_help();*/
+        exitcode = 1;
+      }
+    }
+    #ifdef OPT_VER
+    else if (!strncmp(argv[1], _ARGHLP("-v")))
+    {
+      if (argc == 3)
+      {
+        /* Version detection is not completed for this moment */
+      }
+      else
+      {
+        printf("Error: insufficient arguments.\n\n");
+        /*print_help();*/
+        exitcode = 1;
+      }
+    }
+    #endif
+    else
+    {
+      printf("Error: incorrect arguments.\n\n");
+      print_usage();
+      exitcode = 1;
+    }
   }
   
   return exitcode;
