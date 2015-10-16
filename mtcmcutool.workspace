@@ -2,10 +2,10 @@
 <CodeLite_Workspace Name="mtcmcutool" Database="">
   <Project Name="mtcmcutool" Path="mtcmcutool.project" Active="Yes"/>
   <BuildMatrix>
-    <WorkspaceConfiguration Name="Debug" Selected="no">
+    <WorkspaceConfiguration Name="Debug" Selected="yes">
       <Project Name="mtcmcutool" ConfigName="Debug"/>
     </WorkspaceConfiguration>
-    <WorkspaceConfiguration Name="Release" Selected="yes">
+    <WorkspaceConfiguration Name="Release" Selected="no">
       <Project Name="mtcmcutool" ConfigName="Release"/>
     </WorkspaceConfiguration>
   </BuildMatrix>
