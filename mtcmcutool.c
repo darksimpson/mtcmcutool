@@ -14,7 +14,7 @@
 void print_banner()
 {
   printf("mtcmcutool: a tool to manipulate MTC MCU firmware images for RK3066/RK3188 headunits.\n");
-  printf("            Version: 1.0\n");
+  printf("            Version: 1.1\n");
   printf("            Copyright (c) 2015, Dark Simpson\n");
   printf("\n");
 }
@@ -258,9 +258,178 @@ FINALLY:
   return result;
 }
 
+bool heuristic_getver(uint8_t *buf, int len, char *verbuf, int verlen)
+{
+  /* NOTE: Nested functions is GCC extension */
+  
+  bool extractstr(uint8_t *buf, int len, int *ptr, char *dstr, int dmax)
+  {
+    int max = (*ptr+dmax > len)?(dmax-((*ptr+dmax)-len)):(dmax);
+    memset(dstr, '\0', dmax);
+    strncpy(dstr, (char *)&buf[*ptr], max);
+    if (dstr[max-1] != '\0') /* Overshot, not looks like our string */
+      return false;
+    *ptr += strlen(dstr)+1;
+    return true;
+  }
+  
+  bool skipzeros(uint8_t *buf, int len, int *ptr, int maxdepth)
+  {
+    int max = (*ptr+maxdepth > len)?(len):(*ptr+maxdepth);
+    for (int i = *ptr; i < max; i++)
+    {
+      if (buf[i] != '\0')
+      {
+        *ptr = i;
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  char verchunks[6][32];
+  int ptr = 0;
+  
+  /* Firstly try to find needed strings */
+  
+  /* For modern FWs heuristic works like this:
+   * Try to find a first string with formatting and version ("MTC%s-%s%s-VXXX")
+   * and then extract all other strings next to it as we know (actually propose)
+   * the order how they will go. Simple. */
+  for (int i = 0; i < len-5; i++)
+  {
+    if ((buf[i] == 'M') && (buf[i+1] == 'T') && (buf[i+2] == 'C') && (buf[i+3] == '%') && (buf[i+4] == 's'))
+    {
+      ptr = i;
+      break;
+    }
+  }
+  if (ptr == 0)
+    return false;
+  
+  /* Extract formatter and version string ("MTS%s-%s%s-xxxx") */
+  if (!extractstr(buf, len, &ptr, verchunks[0], 32))
+    return false;
+  /* Skip zeroes (not more than 10) to the beginning of next string */
+  if (!skipzeros(buf, len, &ptr, 10))
+    return false;
+  
+  /* Extract some identifier ("B") */
+  if (!extractstr(buf, len, &ptr, verchunks[1], 32))
+    return false;
+  if (!skipzeros(buf, len, &ptr, 10))
+    return false;
+  /* Additional sanity check for now */
+  if (strlen(verchunks[1]) != 1 && verchunks[1][0] != 'B')
+    return false;
+
+  /* Extract variant name ("JY", "KGL", etc...) */
+  if (!extractstr(buf, len, &ptr, verchunks[2], 32))
+    return false;
+  if (!skipzeros(buf, len, &ptr, 10))
+    return false;
+  
+  /* Extract date of build */
+  if (!extractstr(buf, len, &ptr, verchunks[4], 32))
+    return false;
+  if (!skipzeros(buf, len, &ptr, 10))
+    return false;
+  
+  /* Extract time of build */
+  if (!extractstr(buf, len, &ptr, verchunks[5], 32))
+    return false;
+  
+  /* Get model number for KGL if applicable */
+  
+  /* For modern FWs heuristic works like this:
+   * We need to find a call to bootloader (0x12 EC 00), and then, 
+   * if we see moving some XRAM address to DPTR (0x90 aa aa) and right after that
+   * moving some const to A (0x74 cc) it is high probablity that we will find
+   * KGL variant number in this constant "cc". So, just do it. */
+  memset(verchunks[3], '\0', 32);
+  if (strncmp(verchunks[2], "KGL", 3) == 0)
+  {
+    for (int i = 0; i < len-8; i++)
+    {
+      if ((buf[i] == 0x12) && (buf[i+1] == 0xEC) && (buf[i+2] == 0x00) &&
+          (buf[i+3] == 0x90) && (buf[i+6] == 0x74) && ((buf[i+7] >= 0x31) && (buf[i+7] <= 0x35)))
+      {
+        verchunks[3][0] = buf[i+7];
+        break;
+      }
+    }
+  }
+  
+  /* Output version info */
+  int res = snprintf(verbuf, verlen, verchunks[0], verchunks[1], verchunks[2], verchunks[3]);
+  if (res < 0 || res >= verlen)
+    return true;
+  
+  /* Output date info */
+  strncat(verbuf, "\n", verlen);
+  strncat(verbuf, verchunks[4], verlen);
+  strncat(verbuf, " ", verlen);
+  strncat(verbuf, verchunks[5], verlen);
+    
+  return true;
+}
+
 bool do_getver(char *fn)
 {
+  uint8_t *buf = NULL;
+  int len = 0;
+  bool result = false;
+  char verinfo[64];
   
+  printf("You have selected MCU firmware version search.\n\n");
+        
+  /* Open firmware */
+  if (!load_to_buffer(fn, &buf, &len))
+    _ERRHLP_RL(2, FINALLY);
+  
+  /* Detect FW type and do needed things to decode if encoded */
+  switch (check_fw(buf, len))
+  {
+    case 2: /* Encoded */
+    {
+      /* Decode */
+      printf("Looks like encoded FW image, decoding...\n");
+      if (!decode_buffer(&buf, &len))
+        _ERRHLP_MRL("Error while decoding!", 2, FINALLY);
+      break; /*In case of... */
+    }
+    case 1: /* Raw */
+    {
+      /* Do nothing */
+      printf("Looks like raw FW image...\n");
+      break;
+    }
+    case 0: default: /* Invalid */
+    {
+      /* Exit */
+      printf("Input file does not looks like FW image!\n");
+      _ERRHLP_RL(2, FINALLY);
+      break; /* In case of... */
+    }
+  }
+  
+  printf("\n");
+  
+  /* Try to get version information */
+  if (!heuristic_getver(buf, len, verinfo, 64))
+    _ERRHLP_ML("Can't get version info!", FINALLY);
+    
+  printf("Version info:\n\n");
+  printf(verinfo);
+  printf("\n");
+  
+  result = true;
+  
+FINALLY:
+  if (buf != NULL)
+    free(buf);
+  
+  return result;
 }
 
 int main(int argc, char **argv)
